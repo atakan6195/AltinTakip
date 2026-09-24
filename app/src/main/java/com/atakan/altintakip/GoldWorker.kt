@@ -16,21 +16,21 @@ class GoldWorker(ctx:Context,p:WorkerParameters):Worker(ctx,p){
   connectTimeout=12000;readTimeout=12000;getInputStream().bufferedReader().use{it.readText()}
  }
  private fun historicalXau(target:ZonedDateTime):Pair<Double,String>?{
-  val from=target.minusMinutes(8).toEpochSecond()
-  val to=target.plusMinutes(12).toEpochSecond()
-  val url="https://query1.finance.yahoo.com/v8/finance/chart/GC%3DF?period1=$from&period2=$to&interval=1m"
-  val root=JSONObject(text(url)).getJSONObject("chart").getJSONArray("result").getJSONObject(0)
-  val ts=root.getJSONArray("timestamp")
-  val closes=root.getJSONObject("indicators").getJSONArray("quote").getJSONObject(0).getJSONArray("close")
-  var best=-1;var bestDiff=Long.MAX_VALUE
-  for(i in 0 until ts.length()){
-   if(closes.isNull(i))continue
-   val diff=kotlin.math.abs(ts.getLong(i)-target.toEpochSecond())
-   if(diff<bestDiff){best=i;bestDiff=diff}
+  val root=JSONObject(text("https://xaus.com/api/v1/intraday?symbol=xau&hours=48"))
+  val points=root.getJSONArray("points")
+  var bestPrice:Double?=null;var bestTime:Instant?=null;var bestDiff=Long.MAX_VALUE
+  for(i in 0 until points.length()){
+   val p=points.getJSONObject(i)
+   val raw=p.get("t")
+   val instant=when(raw){
+    is Number -> Instant.ofEpochSecond(raw.toLong())
+    else -> Instant.parse(raw.toString())
+   }
+   val diff=kotlin.math.abs(instant.epochSecond-target.toEpochSecond())
+   if(diff<bestDiff){bestDiff=diff;bestPrice=p.getDouble("p");bestTime=instant}
   }
-  if(best<0)return null
-  val instant=Instant.ofEpochSecond(ts.getLong(best))
-  return closes.getDouble(best) to instant.atZone(zone).format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+  if(bestPrice==null||bestTime==null||bestDiff>20*60)return null
+  return bestPrice!! to bestTime!!.atZone(zone).format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
  }
  private fun fxTry():Double=JSONObject(text("https://api.frankfurter.app/latest?from=USD&to=TRY")).getJSONObject("rates").getDouble("TRY")
 
@@ -44,18 +44,18 @@ class GoldWorker(ctx:Context,p:WorkerParameters):Worker(ctx,p){
 
   // O günün referansı yoksa, Türkiye saati 00:05'e en yakın geçmiş 1 dakikalık altın verisini sonradan da çek.
   if(sp.getString("day","")!=today && !now.toLocalTime().isBefore(LocalTime.of(0,5))){
+   val inWindow=now.toLocalTime().isBefore(LocalTime.of(0,25))
    val target=now.toLocalDate().atTime(0,5).atZone(zone)
-   val hist=historicalXau(target)
+   val hist=if(inWindow) Pair(xau,now.format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))) else historicalXau(target)
    if(hist!=null){
-    // Gram referansı için mevcut FX yerine o günün günlük USD/TRY referansını kullanıyoruz.
-    // FX kaynağı günlük olduğundan bu, 00:05'e en yakın mevcut TRY dönüşümüdür.
     val refXau=hist.first
     val refGram=refXau*fx/31.1034768
     sp.edit().putString("day",today)
      .putLong("xau0",java.lang.Double.doubleToRawLongBits(refXau))
      .putLong("gram0",java.lang.Double.doubleToRawLongBits(refGram))
      .putBoolean("xAlert",false).putBoolean("gAlert",false)
-     .putString("referenceTime",hist.second).apply()
+     .putString("referenceTime",hist.second)
+     .putString("referenceSource",if(inWindow)"İnternet canlı veri" else "İnternet geçmiş veri").apply()
    }
   }
 
