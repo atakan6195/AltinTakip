@@ -52,7 +52,7 @@ class MainActivity:AppCompatActivity(){
    "\nGram Altın: "+prefs.getString("gram","Henüz veri yok")+
    "\n\nGünlük değişim (ons): "+prefs.getString("xauPct","-")+
    "\nGünlük değişim (gram): "+prefs.getString("gramPct","-")+
-   "\n\nPil dostu arka plan kontrolü: ~15 dk"+
+   "\nReferans zamanı: "+prefs.getString("referenceTime","Henüz alınmadı")+"\n\nPil dostu arka plan kontrolü: ~15 dk"+
    "\nSon kontrol: "+prefs.getString("last","-")
  }
 }
