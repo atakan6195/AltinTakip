@@ -13,8 +13,14 @@ class GoldWorker(ctx:Context,p:WorkerParameters):Worker(ctx,p){
   val xau=JSONObject(URL("https://api.gold-api.com/price/XAU").readText()).getDouble("price")
   val fx=JSONObject(URL("https://api.frankfurter.app/latest?from=USD&to=TRY").readText()).getJSONObject("rates").getDouble("TRY")
   val gram=xau*fx/31.1034768
-  val sp=applicationContext.getSharedPreferences("p",Context.MODE_PRIVATE);val zone=ZoneId.of("Europe/Istanbul");val day=LocalDate.now(zone).toString()
-  if(sp.getString("day","")!=day)sp.edit().putString("day",day).putLong("xau0",java.lang.Double.doubleToRawLongBits(xau)).putLong("gram0",java.lang.Double.doubleToRawLongBits(gram)).putBoolean("xAlert",false).putBoolean("gAlert",false).apply()
+  val sp=applicationContext.getSharedPreferences("p",Context.MODE_PRIVATE);val zone=ZoneId.of("Europe/Istanbul")
+  val now=ZonedDateTime.now(zone)
+  // A trading/reference day starts at 00:05 Türkiye time. Before 00:05, keep using the previous day's reference.
+  val referenceDay=if(now.toLocalTime().isBefore(LocalTime.of(0,5))) now.toLocalDate().minusDays(1) else now.toLocalDate()
+  val day=referenceDay.toString()
+  if(sp.getString("day","")!=day && !now.toLocalTime().isBefore(LocalTime.of(0,5))){
+   sp.edit().putString("day",day).putLong("xau0",java.lang.Double.doubleToRawLongBits(xau)).putLong("gram0",java.lang.Double.doubleToRawLongBits(gram)).putBoolean("xAlert",false).putBoolean("gAlert",false).putString("referenceTime",now.format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))).apply()
+  }
   val x0=java.lang.Double.longBitsToDouble(sp.getLong("xau0",java.lang.Double.doubleToRawLongBits(xau)));val g0=java.lang.Double.longBitsToDouble(sp.getLong("gram0",java.lang.Double.doubleToRawLongBits(gram)))
   val xp=(xau/x0-1)*100;val gp=(gram/g0-1)*100;val th=sp.getFloat("threshold",2f).toDouble()
   fun alarm(name:String,pct:Double,price:String,key:String){val outside=abs(pct)>=th;val alerted=sp.getBoolean(key,false)
