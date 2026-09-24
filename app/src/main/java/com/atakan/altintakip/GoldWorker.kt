@@ -32,12 +32,15 @@ class GoldWorker(ctx:Context,p:WorkerParameters):Worker(ctx,p){
   if(bestPrice==null||bestTime==null||bestDiff>20*60)return null
   return bestPrice!! to bestTime!!.atZone(zone).format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
  }
- private fun fxTry():Double=JSONObject(text("https://api.frankfurter.app/latest?from=USD&to=TRY")).getJSONObject("rates").getDouble("TRY")
+
 
  override fun doWork():Result=try{
-  val xau=JSONObject(text("https://api.gold-api.com/price/XAU")).getDouble("price")
-  val fx=fxTry()
-  val gram=xau*fx/31.1034768
+  val live=JSONObject(text("https://xaus.com/api/v1/spot?currency=TRY&unit=gram&compact=1&fresh="+System.currentTimeMillis()))
+  val state=live.optJSONObject("data_state")?.optString("status","fresh") ?: "fresh"
+  if(state=="unavailable") return Result.retry()
+  val xau=live.getDouble("spot_usd_oz")
+  val gram=live.getJSONObject("xau").getDouble("price")
+  val fx=live.optDouble("fx_rate",gram*31.1034768/xau)
   val sp=applicationContext.getSharedPreferences("p",Context.MODE_PRIVATE)
   val now=ZonedDateTime.now(zone)
   val today=now.toLocalDate().toString()
