@@ -28,6 +28,7 @@ class MainActivity:AppCompatActivity(){
   root.addView(TextView(this).apply{text="Referans değerleri (gerekirse elle düzeltilebilir):"})
   root.addView(refXau);root.addView(refGram);root.addView(refOk);root.addView(threshold);root.addView(save);root.addView(refresh);setContentView(root)
   show()
+  ReferenceScheduler.scheduleNext(this)
   refOk.setOnClickListener{
    val x=refXau.text.toString().replace(",",".").toDoubleOrNull();val gr=refGram.text.toString().replace(",",".").toDoubleOrNull()
    if(x==null||gr==null||x<=0||gr<=0){Toast.makeText(this,"Geçerli iki referans değeri girin",Toast.LENGTH_SHORT).show();return@setOnClickListener}
