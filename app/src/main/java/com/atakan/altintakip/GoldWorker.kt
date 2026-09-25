@@ -34,7 +34,8 @@ class GoldWorker(ctx:Context,p:WorkerParameters):Worker(ctx,p){
  }
 
 
- override fun doWork():Result=try{
+ override fun doWork():Result {
+  return try{
   val live=JSONObject(text("https://xaus.com/api/v1/spot?currency=TRY&unit=gram&compact=1&fresh="+System.currentTimeMillis()))
   val state=live.optJSONObject("data_state")?.optString("status","fresh") ?: "fresh"
   if(state=="unavailable") return Result.retry()
@@ -84,5 +85,6 @@ class GoldWorker(ctx:Context,p:WorkerParameters):Worker(ctx,p){
   sp.edit().putString("xau","$"+"%.2f".format(xau)).putString("gram","%.2f TL".format(gram))
    .putString("last",now.format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))).apply()
   Result.success()
- }catch(e:Exception){Result.retry()}
+  }catch(e:Exception){Result.retry()}
+ }
 }
